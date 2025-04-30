@@ -1,0 +1,46 @@
+h2 {
+    color: #3581cc;
+    margin: 0px 0px 0px -10px;
+}
+
+img {
+    margin: 0px 0px 0px -10px;
+}
+
+body {
+    background-image: url('image.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    font-family: "Bagel Fat One", system-ui;
+    display: flex;
+    justify-content: left;
+    align-items: left;
+    height: 100vh;
+    margin: 0;
+    position: relative;
+}
+
+#barre-laterale {
+    width: 100px;
+    background-color: ghostwhite;
+    text-align: center;
+    border-radius: 0% 30px 30px 0%;
+    padding: 20px;
+    position: relative;
+}
+
+button {
+    margin-top: 20px;
+    padding: 8px;
+    border: none;
+    border-radius: 8px;
+    background-color: #3581cc;
+    color: white;
+    cursor: pointer;
+    position: relative;
+}
+
+button:hover {
+    background-color: #175fa6;
+}
