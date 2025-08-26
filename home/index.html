@@ -5,7 +5,6 @@
     <title>MyGenda - Dashboard</title>
     <link href="style1.css" rel="stylesheet">
     <style>
-        /* Barre latérale */
         #barre-laterale {
             width: 250px;
             height: 100vh;
@@ -17,14 +16,12 @@
             padding: 20px;
             box-sizing: border-box;
         }
-
         #bienvenue {
             font-size: 18px;
             font-weight: bold;
             word-wrap: break-word;
             overflow-wrap: break-word;
         }
-
         #logout-button {
             position: absolute;
             bottom: 20px;
@@ -34,12 +31,10 @@
             padding: 10px;
         }
 
-        /* Panneau des commandes */
         #commandes-panel {
             margin-left: 270px;
             padding: 20px;
         }
-
         .commande {
             background: #fff;
             border: 1px solid #ddd;
@@ -48,19 +43,8 @@
             margin-bottom: 15px;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
         }
-
-        .commande h3 {
-            margin: 0 0 10px;
-            font-size: 16px;
-            color: #333;
-        }
-
-        .commande p {
-            margin: 5px 0;
-            color: #555;
-            font-size: 14px;
-        }
-
+        .commande h3 { margin: 0 0 10px; font-size: 16px; color: #333; }
+        .commande p { margin: 5px 0; color: #555; font-size: 14px; }
         .commande button {
             background-color: #ff2e5c;
             border: none;
@@ -70,16 +54,14 @@
             cursor: pointer;
             font-size: 14px;
         }
-
-        .commande button:hover {
-            background-color: #e60050;
-        }
+        .commande button:hover { background-color: #e60050; }
     </style>
-    
-    <!-- Firebase SDK -->
+
+    <!-- Firebase SDK Realtime DB -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
 <body>
     <div id="barre-laterale">
@@ -95,61 +77,67 @@
     </div>
 
     <script>
-        // Configuration Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyBVy-VDJ70EwE1xLcQbjECNPbxy1R8p3_g",
             authDomain: "mygenda-53f53.firebaseapp.com",
             projectId: "mygenda-53f53",
+            databaseURL: "https://mygenda-53f53-default-rtdb.firebaseio.com/",
             storageBucket: "mygenda-53f53.firebasestorage.app",
             messagingSenderId: "485805978040",
             appId: "1:485805978040:web:bf77d1457822af6d59df4d",
             measurementId: "G-7D6WGYN0QL"
         };
 
-        // Initialiser Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
+        const rtdb = firebase.database();
 
-        // Redirection si pas connecté
         function redirectToLogin() {
             window.location.href = "https://xeroxytb.github.io/Mygenda";
         }
 
-        // Vérification de l'état d'authentification
-        auth.onAuthStateChanged(user => {
+        auth.onAuthStateChanged(async user => {
             if (user) {
-                // Récupérer et afficher les infos utilisateur
-                db.collection('users').doc(user.uid).get().then(doc => {
-                    if (doc.exists) {
-                        const data = doc.data();
+                // Charger le nom depuis Firestore
+                try {
+                    const userDoc = await db.collection("users").doc(user.uid).get();
+                    if (userDoc.exists) {
+                        const data = userDoc.data();
                         document.getElementById("bienvenue").innerText = `Bienvenue ${data.prenom} ${data.nom}`;
                         sessionStorage.setItem("userPrenom", data.prenom);
                         sessionStorage.setItem("userNom", data.nom);
                         sessionStorage.setItem("userEmail", data.email);
+                    } else {
+                        document.getElementById("bienvenue").innerText = `Bienvenue ${user.email}`;
                     }
-                });
+                } catch (err) {
+                    console.error(err);
+                    document.getElementById("bienvenue").innerText = `Bienvenue ${user.email}`;
+                }
 
-                // Charger les commandes
                 chargerCommandes();
             } else {
-                alert("Vous n'êtes pas connecté. Redirection vers la page de connexion.");
+                alert("Vous n'êtes pas connecté. Redirection...");
                 redirectToLogin();
             }
         });
 
-        // Charger et afficher les commandes
         function chargerCommandes() {
             const liste = document.getElementById("liste-commandes");
-            db.collection("commandes").onSnapshot(snapshot => {
+            const commandesRef = rtdb.ref("commandes");
+
+            commandesRef.on("value", snapshot => {
                 liste.innerHTML = "";
-                if (snapshot.empty) {
+                if (!snapshot.exists()) {
                     liste.innerHTML = "<p>Aucune commande en cours.</p>";
                     return;
                 }
 
-                snapshot.forEach(doc => {
-                    const data = doc.data();
+                snapshot.forEach(childSnap => {
+                    const key = childSnap.key;
+                    const data = childSnap.val();
+
                     const div = document.createElement("div");
                     div.className = "commande";
                     div.innerHTML = `
@@ -157,26 +145,19 @@
                         <p><strong>URL :</strong> <a href="${data.url}" target="_blank">${data.url}</a></p>
                         <p><strong>Nombre de vues :</strong> ${data.vues || data.likes}</p>
                         <p><strong>Date :</strong> ${new Date(data.date).toLocaleString()}</p>
-                        <button onclick="terminerCommande('${doc.id}')">Marquer comme terminée</button>
+                        <button id="btn-${key}">Marquer comme terminée</button>
                     `;
                     liste.appendChild(div);
+
+                    document.getElementById(`btn-${key}`).addEventListener("click", () => {
+                        if (confirm("Marquer cette commande comme terminée ?")) {
+                            rtdb.ref("commandes/" + key).remove();
+                        }
+                    });
                 });
             });
         }
 
-        // Marquer une commande comme terminée
-        async function terminerCommande(id) {
-            if (confirm("Marquer cette commande comme terminée ?")) {
-                try {
-                    await db.collection("commandes").doc(id).delete();
-                    alert("Commande marquée comme terminée.");
-                } catch (error) {
-                    alert("Erreur : " + error.message);
-                }
-            }
-        }
-
-        // Déconnexion
         document.getElementById("logout-button").addEventListener("click", async () => {
             await auth.signOut();
             sessionStorage.clear();
