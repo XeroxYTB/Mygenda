@@ -77,11 +77,11 @@
                 
                 console.log("Redirection vers la page principale");
                 // Rediriger vers la page principale
-                window.location.href = "main1.html";
+                window.location.href = "https://xeroxytb.github.io/Mygenda/home";
               } else {
                 console.log("Document utilisateur non trouvé dans Firestore");
                 sessionStorage.setItem("userEmail", user.email);
-                window.location.href = "main1.html";
+                window.location.href = "https://xeroxytb.github.io/Mygenda/home";
               }
             })
             .catch(error => {
@@ -199,4 +199,5 @@
   </script>
 </body>
 </html>
+
 
