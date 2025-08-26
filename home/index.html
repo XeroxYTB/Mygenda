@@ -5,12 +5,14 @@
     <title>MyGenda - Dashboard</title>
     <link href="style1.css" rel="stylesheet">
     <style>
-        /* Styles de base pour éviter le débordement */
+        /* Barre latérale */
         #barre-laterale {
             width: 250px;
             height: 100vh;
             overflow: hidden;
-            position: relative;
+            position: fixed;
+            left: 0;
+            top: 0;
             background-color: #f2f2f2;
             padding: 20px;
             box-sizing: border-box;
@@ -31,6 +33,47 @@
             width: calc(100% - 40px);
             padding: 10px;
         }
+
+        /* Panneau des commandes */
+        #commandes-panel {
+            margin-left: 270px;
+            padding: 20px;
+        }
+
+        .commande {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .commande h3 {
+            margin: 0 0 10px;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .commande p {
+            margin: 5px 0;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .commande button {
+            background-color: #ff2e5c;
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .commande button:hover {
+            background-color: #e60050;
+        }
     </style>
     
     <!-- Firebase SDK -->
@@ -41,12 +84,18 @@
 <body>
     <div id="barre-laterale">
         <h2 id="bienvenue">Chargement...</h2>
-        <!-- autres éléments -->
         <button id="logout-button">Déconnexion</button>
     </div>
 
+    <div id="commandes-panel">
+        <h2>Commandes en cours</h2>
+        <div id="liste-commandes">
+            <p>Chargement des commandes...</p>
+        </div>
+    </div>
+
     <script>
-        // Configuration Firebase avec vos clés
+        // Configuration Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyBVy-VDJ70EwE1xLcQbjECNPbxy1R8p3_g",
             authDomain: "mygenda-53f53.firebaseapp.com",
@@ -62,82 +111,77 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // Fonction pour rediriger vers la page de connexion
+        // Redirection si pas connecté
         function redirectToLogin() {
             window.location.href = "https://xeroxytb.github.io/Mygenda";
         }
 
-        // Vérifier si l'utilisateur est connecté
+        // Vérification de l'état d'authentification
         auth.onAuthStateChanged(user => {
             if (user) {
-                // Essayer d'abord de récupérer les données depuis Firestore
-                db.collection('users').doc(user.uid).get()
-                    .then(doc => {
-                        if (doc.exists) {
-                            const userData = doc.data();
-                            document.getElementById("bienvenue").innerText = `Bienvenue ${userData.prenom} ${userData.nom}`;
-                            
-                            // Stocker les données en session pour d'autres pages
-                            sessionStorage.setItem("userPrenom", userData.prenom);
-                            sessionStorage.setItem("userNom", userData.nom);
-                            sessionStorage.setItem("userEmail", userData.email);
-                        } else {
-                            // Fallback si les données ne sont pas trouvées dans Firestore
-                            const prenom = sessionStorage.getItem("userPrenom");
-                            const nom = sessionStorage.getItem("userNom");
-                            
-                            if (prenom && nom) {
-                                document.getElementById("bienvenue").innerText = `Bienvenue ${prenom} ${nom}`;
-                            } else {
-                                document.getElementById("bienvenue").innerText = `Bienvenue ${user.email}`;
-                            }
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Erreur lors de la récupération des données:", error);
-                        
-                        // Fallback vers sessionStorage
-                        const prenom = sessionStorage.getItem("userPrenom");
-                        const nom = sessionStorage.getItem("userNom");
-                        
-                        if (prenom && nom) {
-                            document.getElementById("bienvenue").innerText = `Bienvenue ${prenom} ${nom}`;
-                        } else {
-                            document.getElementById("bienvenue").innerText = `Bienvenue ${user.email}`;
-                        }
-                    });
+                // Récupérer et afficher les infos utilisateur
+                db.collection('users').doc(user.uid).get().then(doc => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        document.getElementById("bienvenue").innerText = `Bienvenue ${data.prenom} ${data.nom}`;
+                        sessionStorage.setItem("userPrenom", data.prenom);
+                        sessionStorage.setItem("userNom", data.nom);
+                        sessionStorage.setItem("userEmail", data.email);
+                    }
+                });
+
+                // Charger les commandes
+                chargerCommandes();
             } else {
-                // L'utilisateur n'est pas connecté
                 alert("Vous n'êtes pas connecté. Redirection vers la page de connexion.");
                 redirectToLogin();
             }
         });
 
+        // Charger et afficher les commandes
+        function chargerCommandes() {
+            const liste = document.getElementById("liste-commandes");
+            db.collection("commandes").onSnapshot(snapshot => {
+                liste.innerHTML = "";
+                if (snapshot.empty) {
+                    liste.innerHTML = "<p>Aucune commande en cours.</p>";
+                    return;
+                }
+
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const div = document.createElement("div");
+                    div.className = "commande";
+                    div.innerHTML = `
+                        <h3>Commande</h3>
+                        <p><strong>URL :</strong> <a href="${data.url}" target="_blank">${data.url}</a></p>
+                        <p><strong>Nombre de vues :</strong> ${data.vues || data.likes}</p>
+                        <p><strong>Date :</strong> ${new Date(data.date).toLocaleString()}</p>
+                        <button onclick="terminerCommande('${doc.id}')">Marquer comme terminée</button>
+                    `;
+                    liste.appendChild(div);
+                });
+            });
+        }
+
+        // Marquer une commande comme terminée
+        async function terminerCommande(id) {
+            if (confirm("Marquer cette commande comme terminée ?")) {
+                try {
+                    await db.collection("commandes").doc(id).delete();
+                    alert("Commande marquée comme terminée.");
+                } catch (error) {
+                    alert("Erreur : " + error.message);
+                }
+            }
+        }
+
         // Déconnexion
         document.getElementById("logout-button").addEventListener("click", async () => {
-            try {
-                await auth.signOut();
-                
-                // Nettoyer le stockage local
-                sessionStorage.removeItem("userPrenom");
-                sessionStorage.removeItem("userNom");
-                sessionStorage.removeItem("userEmail");
-                
-                console.log("Déconnexion réussie");
-                redirectToLogin();
-            } catch (error) {
-                console.error("Erreur de déconnexion:", error);
-                
-                // En cas d'erreur, on vide quand même le stockage local
-                sessionStorage.removeItem("userPrenom");
-                sessionStorage.removeItem("userNom");
-                sessionStorage.removeItem("userEmail");
-                
-                alert("Erreur lors de la déconnexion, mais vous avez été déconnecté localement");
-                redirectToLogin();
-            }
+            await auth.signOut();
+            sessionStorage.clear();
+            redirectToLogin();
         });
     </script>
 </body>
 </html>
-
